@@ -43,6 +43,14 @@ return array(
             'connection' => 'default',
         ),
 
+        'push' => array(
+            'driver' => 'push',
+            'secret' => 'SomeRandomStringThere_1234567890',
+
+            'host'   => site_url(),
+            'port'   => 2121,
+        ),
+
         'log' => array(
             'driver' => 'log',
         ),
