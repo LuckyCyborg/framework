@@ -140,7 +140,7 @@ $socketIo->on('connection', function ($socket) use ($socketIo)
     });
 
     // Triggered when the client sends a unsubscribe event.
-    $socket->on('unsubscribe', function ($channel) use ($socket)
+    $socket->on('unsubscribe', function ($channel) use ($socket, $socketIo)
     {
         global $presence;
 
@@ -171,25 +171,19 @@ $socketIo->on('connection', function ($socket) use ($socketIo)
     });
 
     // Triggered when the client sends a message event.
-    $socket->on('message', function ($channel, $message) use ($socket)
+    $socket->on('client event', function ($channel, $event, $data) use ($socket)
     {
-        global $presence;
+        if (preg_match('#^(private|presence)-(.*)#', $channel) !== 1) {
+            // The channel is not private.
 
-        //
-        $socketId = $socket->id;
-
-        $channel = (string) $channel;
-
-        if ((strpos($channel, 'presence-') === 0) && isset($presence[$channel])) {
-            $members =& $presence[$channel];
-
-            if (array_key_exists($socketId, $members)) {
-                $member = $members[$socketId];
-
-                $socket->to($channel)->emit('presence:message', $channel, htmlentities($message), $member);
-            }
+            return;
         }
-    });
+
+        // If the socket joined the channel and it is a client event, we will emit it.
+        else if ((preg_match('#^client-(.*)$#', $event) === 1) && isset($socket->rooms[$channel])) {
+            $socket->to($channel)->emit($event, $channel, $data);
+        }
+    }
 
     // When the client is disconnected is triggered (usually caused by closing the web page or refresh)
     $socket->on('disconnect', function () use ($socket)
