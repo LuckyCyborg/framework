@@ -69,7 +69,7 @@ class PushBroadcaster extends Broadcaster
 
         $channel = preg_replace('/^(private|presence)\-/', '', $channelName, 1, $count);
 
-        if (($count == 1) && is_null($request->user())) {
+        if (($count == 1) && is_null($user = $request->user())) {
             throw new AccessDeniedHttpException;
         }
 
@@ -90,16 +90,14 @@ class PushBroadcaster extends Broadcaster
         $socketId = $request->input('socket_id');
 
         if (Str::startsWith($channel, 'private')) {
-            $result = $this->socketAuth($channel, $socketId);
-        } else {
-            $user = $request->user();
-
-            $result = $this->presenceAuth(
-                $channel, $socketId, $user->getAuthIndentifier(), $result
-            );
+            return $this->socketAuth($channel, $socketId);
         }
 
-        return json_decode($result, true);
+        $user = $request->user();
+
+        return $this->presenceAuth(
+            $channel, $socketId, $user->getAuthIdentifier(), $result
+        );
     }
 
     /**
@@ -189,7 +187,7 @@ class PushBroadcaster extends Broadcaster
 
         // Add the custom data if it has been supplied.
         if (! is_null($customData)) {
-            $signature['channel_data'] = $customData;
+            $signature['payload'] = $customData;
         }
 
         return json_encode($signature);
@@ -206,10 +204,10 @@ class PushBroadcaster extends Broadcaster
      */
     public function presenceAuth($channel, $socketId, $userId, $userInfo = null)
     {
-        $userData = array('user_id' => $userId);
+        $userData = array('userId' => $userId);
 
         if (! is_null($userInfo)) {
-            $userdata['user_info'] = $userInfo;
+            $userData['userInfo'] = $userInfo;
         }
 
         return $this->socketAuth($channel, $socketId, json_encode($userData));

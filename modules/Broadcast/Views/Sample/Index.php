@@ -28,7 +28,7 @@
 <script>
 
 $(document).ready(function () {
-    var channel = 'private-Modules.Users.Models.User.<?= Auth::id(); ?>';
+    var channel = 'presence-chat';
 
     // The connection server.
     var socket = io('<?= site_url(); ?>' + ':2120');
@@ -49,14 +49,28 @@ $(document).ready(function () {
                 socket_id: socket.id
             },
             dataType: 'json',
-            success: function (signature) {
-                socket.emit('authenticate', channel, signature);
+            success: function (data) {
+                socket.emit('subscribe', channel, data);
             },
             error: function(xhr, ajaxOptions, thrownError) {
                 socket.disconnect();
             },
             timeout : 15000 // Timeout of the ajax call.
         });
+    });
+
+    socket.on('presence:subscribed', function (channel, members) {
+        console.log('subscribed to channel: ' + channel);
+        console.log(members);
+    });
+
+    socket.on('presence:joining', function (channel, member) {
+        console.log('joining the channel: ' + channel);
+        console.log(member);
+    });
+
+    socket.on('presence:leaving', function (channel) {
+        console.log('leaving the channel: ' + channel);
     });
 
     // When the back-end pushes messages ...
