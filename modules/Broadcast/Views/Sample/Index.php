@@ -71,8 +71,6 @@ $(document).ready(function () {
 
     // The connection server.
     var socket = io.connect('<?= site_url(); ?>' + ':2120/' + appId);
-    //var socket = io.connect('<?= site_url(); ?>' + ':2120');
-
 
     (function () {
         var emit = socket.emit,
