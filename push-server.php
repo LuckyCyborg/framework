@@ -261,7 +261,7 @@ $socketIo->on('workerStart', function () use ($socketIo)
         }
 
         //
-        // Here ends the mini-routing; continue with emiting the event.
+        // Here ends the mini-routing; we will continue with emiting the event.
 
         $channels = $_POST['channels'];
         $event    = $_POST['event'];
