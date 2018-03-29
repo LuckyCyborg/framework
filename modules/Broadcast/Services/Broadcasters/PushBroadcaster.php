@@ -125,15 +125,15 @@ class PushBroadcaster extends Broadcaster
     protected function trigger($channels, $event, $data, $socketId = null)
     {
         $payload = array(
-            'channels' => $channels,
-            'event'    => $event,
-            'data'     => $data,
-            'socketId' => $socketId,
+            'channels' => json_encode($channels),
+            'event'    => str_replace('\\', '.', $event),
+            'data'     => json_encode($data),
+            'socketId' => $socketId ?: '',
         );
 
         $path = '/events';
 
-        $hash = hash_hmac('sha256', "POST\n" .trim($path, '/') .':' .json_encode($payload), false);
+        $hash = hash_hmac('sha256', "POST\n" .trim($path, '/') .':' .json_encode($payload), $this->secretKey, false);
 
         // Compute the server URL.
         $url = $this->host .':' .$this->port .$path;
@@ -155,6 +155,10 @@ class PushBroadcaster extends Broadcaster
             return ($status == 200) && ($response->getBody() == '200 OK');
         }
         catch (RequestException $e) {
+            dump($client);
+
+            dump($e->getMessage());
+
             throw new BroadcastException($e->getMessage());
         }
     }

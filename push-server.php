@@ -102,6 +102,8 @@ $socketIo->on('connection', function ($socket) use ($socketIo)
         $socket->join($channel);
 
         if ($type == 'private') {
+            $socketIo->to($socketId)->emit('private:subscribed', $channel);
+
             return;
         }
 
@@ -262,15 +264,16 @@ $socketIo->on('workerStart', function () use ($socketIo)
         //
         // Here ends the mini-routing; we will continue with emiting the event.
 
-        $channels = $_POST['channels'];
-        $event    = $_POST['event'];
+        $channels = json_decode($_POST['channels'], true);
+
+        $event = str_replace('\\', '.', $_POST['event']);
 
         $data = json_decode($_POST['data'], true);
 
         // We will try to find the Socket instance when a socketId is specified.
         $socket = null;
 
-        if (isset($_POST['socketId'])) {
+        if (! empty($_POST['socketId'])) {
             $socketId = $_POST['socketId'];
 
             if (isset($socketIo->sockets->connected[$socketId])) {

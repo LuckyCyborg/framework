@@ -16,7 +16,7 @@
         <h3 class="box-title"><?= __d('broadcast', 'Tests'); ?></h3>
     </div>
     <div class="box-body">
-        <a class="btn btn-success col-sm-2 pull-right" href="#"><?= __d('broadcast', 'Send a new Push'); ?></a>
+        <p class="text-center">A new <b>Sample</b> Event was broadcasted.</p>
     </div>
 </div>
 
