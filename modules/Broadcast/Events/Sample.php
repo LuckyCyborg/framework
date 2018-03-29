@@ -25,15 +25,22 @@ class Sample implements ShouldBroadcastInterface
      */
     public $user;
 
+    /**
+     * @var int
+     */
+    private $userId;
+
 
     /**
      * Create a new Event instance.
      *
      * @return void
      */
-    public function __construct(User $user)
+    public function __construct(User $user, $userId)
     {
         $this->user = $user;
+
+        $this->userId = $userId;
     }
 
     /**
@@ -43,6 +50,6 @@ class Sample implements ShouldBroadcastInterface
      */
     public function broadcastOn()
     {
-        return new PrivateChannel('Modules.Users.Models.User.1');
+        return new PrivateChannel('Modules.Users.Models.User.' .$this->userId);
     }
 }

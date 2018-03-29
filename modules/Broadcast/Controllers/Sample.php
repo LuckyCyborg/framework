@@ -21,7 +21,7 @@ class Sample extends BaseController
     {
         $user = Auth::user();
 
-        broadcast(new SampleEvent($user));
+        broadcast(new SampleEvent($user, $user->id));
 
         return $this->createView()->shares('title', __d('push_server', 'Create Push Notifications'));
     }
