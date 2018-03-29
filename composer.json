@@ -26,6 +26,10 @@
         {
             "type": "git",
             "url": "https://github.com/nova-framework/system"
+        },
+        {
+            "type": "git",
+            "url": "https://github.com/LuckyCyborg/phpsocket.io.git"
         }
     ],
     "require": {
@@ -41,7 +45,7 @@
         "dompdf/dompdf": "^0.8",
         "thunderer/shortcode": "^0.6",
         "intervention/image": "^2.4",
-        "workerman/phpsocket.io" : "^1.0.0"
+        "workerman/phpsocket.io" : "dev-master"
     },
     "require-dev": {
         "fzaninotto/faker": "^1.6"

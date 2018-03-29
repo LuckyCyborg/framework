@@ -19,6 +19,14 @@ use GuzzleHttp\Client as HttpClient;
 class PushBroadcaster extends Broadcaster
 {
     /**
+     * The application ID to access the Push Server.
+     *
+     * @var string
+     */
+    protected $appId;
+
+
+    /**
      * The secret key to access the Push Server.
      *
      * @var string
@@ -50,6 +58,7 @@ class PushBroadcaster extends Broadcaster
         parent::__construct($container);
 
         //
+        $this->appId     = Arr::get($config, 'appId');
         $this->secretKey = Arr::get($config, 'secret');
 
         $this->host = Arr::get($config, 'host', site_url());
@@ -131,9 +140,10 @@ class PushBroadcaster extends Broadcaster
             'socketId' => $socketId ?: '',
         );
 
-        $path = '/events';
+        $path = '/apps/' .$this->appId .'/events';
 
-        $hash = hash_hmac('sha256', "POST\n" .trim($path, '/') .':' .json_encode($payload), $this->secretKey, false);
+        //
+        $hash = hash_hmac('sha256', "POST\n" .$path .':' .json_encode($payload), $this->secretKey, false);
 
         // Compute the server URL.
         $url = $this->host .':' .$this->port .$path;
@@ -172,10 +182,11 @@ class PushBroadcaster extends Broadcaster
         if (preg_match('#^[-a-zA-Z0-9_=@,.;]+$#', $channel) !== 1) {
             throw new BroadcastException('Invalid channel name ' .$channel);
         }
-
+        /*
         if (preg_match('#^[a-z0-9]+$#', $socketId) !== 1) {
             throw new BroadcastException('Invalid socket ID ' .$socketId);
         }
+        */
 
         if (! is_null($customData)) {
             $signature = hash_hmac('sha256', $socketId .':' .$channel .':' .$customData, $this->secretKey, false);

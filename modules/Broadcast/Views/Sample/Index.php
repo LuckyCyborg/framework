@@ -28,6 +28,8 @@
 <script>
 
 function socket_subscribe(socket, channel) {
+    console.log('socket.id', socket.id);
+
     $.ajax({
         url: "<?= site_url('broadcasting/auth'); ?>",
         type: "POST",
@@ -61,12 +63,16 @@ function socket_unsubscribe(socket, channel) {
 
 
 $(document).ready(function () {
+    var appId = 'JPNSWIRFavLVLhjI25MXXVRyMHUjjeWI';
+
     var userChannel = 'private-Modules.Users.Models.User.<?= Auth::id(); ?>';
 
     var chatChannel = 'presence-chat';
 
     // The connection server.
-    var socket = io('<?= site_url(); ?>' + ':2120');
+    var socket = io.connect('<?= site_url(); ?>' + ':2120/' + appId);
+    //var socket = io.connect('<?= site_url(); ?>' + ':2120');
+
 
     (function () {
         var emit = socket.emit,

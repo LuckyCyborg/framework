@@ -6,7 +6,6 @@ use Workerman\WebServer;
 use Workerman\Lib\Timer;
 use PHPSocketIO\SocketIO;
 
-
 //--------------------------------------------------------------------------
 // Global Configuration
 //--------------------------------------------------------------------------
@@ -16,6 +15,12 @@ defined('DS') || define('DS', DIRECTORY_SEPARATOR);
 define('BASEPATH', realpath(__DIR__) .DS);
 
 define('STORAGE_PATH', BASEPATH .'storage' .DS);
+
+//--------------------------------------------------------------------------
+// Load the Composer Autoloader
+//--------------------------------------------------------------------------
+
+include BASEPATH . 'vendor/autoload.php';
 
 
 //--------------------------------------------------------------------------
@@ -27,14 +32,17 @@ define('SENDER_PORT', 2120);
 define('SERVER_HOST', '0.0.0.0');
 define('SERVER_PORT', 2121);
 
-define('SECRET_KEY', 'SomeRandomStringThere_1234567890');
-
 
 //--------------------------------------------------------------------------
-// Load the Composer Autoloader
+// Clients Configuration
 //--------------------------------------------------------------------------
 
-include BASEPATH . 'vendor/autoload.php';
+$clients = array(
+    // 'appId' => 'secretKey',
+
+    'JPNSWIRFavLVLhjI25MXXVRyMHUjjeWI' => 'PBxOhgCQbfn03qJA0TH94fYDPiNKlpYq',
+    'RirfFRAqEAigkzFXlxCj1arDfqLhWiDW' => 'HJQOOlGkHVILcHRoA8M9MZ563k2IT2ki',
+);
 
 
 //--------------------------------------------------------------------------
@@ -61,99 +69,155 @@ $presence = array();
 $socketIo = new SocketIO(SENDER_PORT);
 
 // When the client initiates a connection event, set various event callbacks for connecting sockets.
-$socketIo->on('connection', function ($socket) use ($socketIo)
-{
-    // Triggered when the client sends a subscribe event.
-    $socket->on('subscribe', function ($channel, $authKey, $data = null) use ($socket, $socketIo)
+foreach (array_keys($clients) as $appId) {
+    $senderIo = $socketIo->of($appId);
+
+    $senderIo->presence = array();
+
+    $senderIo->on('connection', function ($socket) use ($senderIo)
     {
-        global $presence;
+        // Triggered when the client sends a subscribe event.
+        $socket->on('subscribe', function ($channel, $authKey, $data = null) use ($socket, $senderIo)
+        {
+            global $clients;
 
-        //
-        $socketId = $socket->id;
+            //
+            $socketId = $socket->id;
 
-        $channel = (string) $channel;
+            $channel = (string) $channel;
 
-        if (preg_match('#^(?:(private|presence)-)?([-a-zA-Z0-9_=@,.;]+)$#', $channel, $matches) !== 1) {
-            $socket->disconnect();
+            if (preg_match('#^(?:(private|presence)-)?([-a-zA-Z0-9_=@,.;]+)$#', $channel, $matches) !== 1) {
+                $socket->disconnect();
 
-            return;
-        }
+                return;
+            }
 
-        $type = ! empty($matches[1]) ? $matches[1] : 'public';
+            $type = ! empty($matches[1]) ? $matches[1] : 'public';
 
-        if ($type == 'public') {
+            if ($type == 'public') {
+                $socket->join($channel);
+
+                return;
+            }
+
+            $appId = trim($socket->nsp->name, '/');
+
+            $secretKey = isset($clients[$appId]) ? $clients[$appId] : null;
+
+            if (is_null($secretKey)) {
+                $socket->disconnect();
+
+                return;
+            }
+
+            // We have a valid appId and its secretKey.
+            else if ($type == 'presence') {
+                $hash = hash_hmac('sha256', $socketId .':' .$channel .':' .$data, $secretKey, false);
+            } else /* private channel */ {
+                $hash = hash_hmac('sha256', $socketId .':' .$channel, $secretKey, false);
+            }
+
+            if ($hash !== $authKey) {
+                $socket->disconnect();
+
+                return;
+            }
+
             $socket->join($channel);
 
-            return;
-        }
-
-        if ($type == 'presence') {
-            $hash = hash_hmac('sha256', $socketId .':' .$channel .':' .$data, SECRET_KEY, false);
-        } else /* private channel */ {
-            $hash = hash_hmac('sha256', $socketId .':' .$channel, SECRET_KEY, false);
-        }
-
-        if ($hash !== $authKey) {
-            $socket->disconnect();
-
-            return;
-        }
-
-        $socket->join($channel);
-
-        if ($type == 'private') {
-            $socketIo->to($socketId)->emit('private:subscribed', $channel);
-
-            return;
-        }
-
-        // A presence channel additionally needs to store the subscribed member's information.
-        else if (! isset($presence[$channel])) {
-            $presence[$channel] = array();
-        }
-
-        $members =& $presence[$channel];
-
-        // Prepare the member information and add its socketId.
-        $member = json_decode($data, true);
-
-        $member['socketId'] = $socketId;
-
-        // Determine if the user is already a member of this channel.
-        $alreadyMember = is_member($members, $member['userId']);
-
-        $members[$socketId] = $member;
-
-        // Emit the events associated with the channel subscription.
-        $items = array();
-
-        foreach (array_values($members) as $member) {
-            if (! array_key_exists($userId = $member['userId'], $items)) {
-                $items[$userId] = $member;
+            if ($type == 'private') {
+                return;
             }
-        }
 
-        $socketIo->to($socketId)->emit('presence:subscribed', $channel, array_values($items));
+            // A presence channel additionally needs to store the subscribed member's information.
+            else if (! isset($socket->nsp->presence[$channel])) {
+                $socket->nsp->presence[$channel] = array();
+            }
 
-        if (! $alreadyMember) {
-            $socket->to($channel)->emit('presence:joining', $channel, $member);
-        }
-    });
+            $members =& $socket->nsp->presence[$channel];
 
-    // Triggered when the client sends a unsubscribe event.
-    $socket->on('unsubscribe', function ($channel) use ($socket, $socketIo)
-    {
-        global $presence;
+            // Prepare the member information and add its socketId.
+            $member = json_decode($data, true);
 
-        //
-        $socketId = $socket->id;
+            $member['socketId'] = $socketId;
 
-        $channel = (string) $channel;
+            // Determine if the user is already a member of this channel.
+            $alreadyMember = is_member($members, $member['userId']);
 
-        if ((strpos($channel, 'presence-') === 0) && isset($presence[$channel])) {
-            $members =& $presence[$channel];
+            $members[$socketId] = $member;
 
-            if (array_key_exists($socketId, $members)) {
+            // Emit the events associated with the channel subscription.
+            $items = array();
+
+            foreach (array_values($members) as $member) {
+                if (! array_key_exists($userId = $member['userId'], $items)) {
+                    $items[$userId] = $member;
+                }
+            }
+
+            $senderIo->to($socketId)->emit('presence:subscribed', $channel, array_values($items));
+
+            if (! $alreadyMember) {
+                $socket->to($channel)->emit('presence:joining', $channel, $member);
+            }
+        });
+
+        // Triggered when the client sends a unsubscribe event.
+        $socket->on('unsubscribe', function ($channel) use ($socket)
+        {
+            $socketId = $socket->id;
+
+            $channel = (string) $channel;
+
+            if ((strpos($channel, 'presence-') === 0) && isset($socket->nsp->presence[$channel])) {
+                $members =& $socket->nsp->presence[$channel];
+
+                if (array_key_exists($socketId, $members)) {
+                    $member = $members[$socketId];
+
+                    unset($member['socketId']);
+
+                    //
+                    unset($members[$socketId]);
+
+                    if (! is_member($members, $member['userId'])) {
+                        $socket->to($channel)->emit('presence:leaving', $channel, $member);
+                    }
+                }
+
+                if (empty($members)) {
+                    unset($socket->nsp->presence[$channel]);
+                }
+            }
+
+            $socket->leave($channel);
+        });
+
+        // Triggered when the client sends a message event.
+        $socket->on('channel:event', function ($channel, $event, $data) use ($socket)
+        {
+            if (preg_match('#^(private|presence)-(.*)#', $channel) !== 1) {
+                // The specified channel is not private.
+
+                return;
+            }
+
+            // If it is a client event and socket joined the channel, we will emit this event.
+            else if ((preg_match('#^client-(.*)$#', $event) === 1) && isset($socket->rooms[$channel])) {
+                $socket->to($channel)->emit($event, $channel, $data);
+            }
+        });
+
+        // When the client is disconnected is triggered (usually caused by closing the web page or refresh)
+        $socket->on('disconnect', function () use ($socket)
+        {
+            $socketId = $socket->id;
+
+            foreach ($socket->nsp->presence as $channel => &$members) {
+                if (! array_key_exists($socketId, $members)) {
+                    continue;
+                }
+
                 $member = $members[$socketId];
 
                 unset($member['socketId']);
@@ -164,63 +228,16 @@ $socketIo->on('connection', function ($socket) use ($socketIo)
                 if (! is_member($members, $member['userId'])) {
                     $socket->to($channel)->emit('presence:leaving', $channel, $member);
                 }
-            }
 
-            if (empty($members)) {
-                unset($presence[$channel]);
-            }
-        }
+                $socket->leave($channel);
 
-        $socket->leave($channel);
+                if (empty($members)) {
+                    unset($socket->nsp->presence[$channel]);
+                }
+            }
+        });
     });
-
-    // Triggered when the client sends a message event.
-    $socket->on('channel:event', function ($channel, $event, $data) use ($socket)
-    {
-        if (preg_match('#^(private|presence)-(.*)#', $channel) !== 1) {
-            // The specified channel is not private.
-
-            return;
-        }
-
-        // If it is a client event and socket joined the channel, we will emit this event.
-        else if ((preg_match('#^client-(.*)$#', $event) === 1) && isset($socket->rooms[$channel])) {
-            $socket->to($channel)->emit($event, $channel, $data);
-        }
-    });
-
-    // When the client is disconnected is triggered (usually caused by closing the web page or refresh)
-    $socket->on('disconnect', function () use ($socket)
-    {
-        global $presence;
-
-        //
-        $socketId = $socket->id;
-
-        foreach ($presence as $channel => &$members) {
-            if (! array_key_exists($socketId, $members)) {
-                continue;
-            }
-
-            $member = $members[$socketId];
-
-            unset($member['socketId']);
-
-            //
-            unset($members[$socketId]);
-
-            if (! is_member($members, $member['userId'])) {
-                $socket->to($channel)->emit('presence:leaving', $channel, $member);
-            }
-
-            $socket->leave($channel);
-
-            if (empty($members)) {
-                unset($presence[$channel]);
-            }
-        }
-    });
-});
+}
 
 // When $socketIo is started, it listens on an HTTP port, through which data can be pushed to any channel.
 $socketIo->on('workerStart', function () use ($socketIo)
@@ -231,12 +248,12 @@ $socketIo->on('workerStart', function () use ($socketIo)
     // Triggered when HTTP client sends data.
     $innerHttpWorker->onMessage = function ($connection) use ($socketIo)
     {
+        global $clients;
+
+        //
         $method = $_SERVER['REQUEST_METHOD'];
 
         $path = trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/') ?: '/';
-
-        // We will do something similar to a POST Route with an Auth Token middleware, like:
-        // Route::post('events', array('middleware' => 'bearer', function () { /* code here */ }));
 
         if ($method !== 'POST') {
             Http::header('HTTP/1.1 405 Method Not Allowed');
@@ -244,25 +261,33 @@ $socketIo->on('workerStart', function () use ($socketIo)
             return $connection->close('405 Method Not Allowed');
         }
 
-        $authToken = isset($_SERVER['HTTP_AUTHORIZATION'])
+        // It is a POST request, check its path.
+        else if (preg_match('#^apps/([^/]+)/events$#', $path, $matches) !== 1) {
+            Http::header('HTTP/1.1 404 Not Found');
+
+            return $connection->close('404 Not Found');
+        }
+
+        $appId = $matches[1];
+
+        $authKey = isset($_SERVER['HTTP_AUTHORIZATION'])
             ? str_replace('Bearer ', '', $_SERVER['HTTP_AUTHORIZATION']) : null;
 
-        if (($path != 'events') || empty($authToken)) {
+        if (! array_key_exists($appId, $clients) || empty($authKey)) {
             Http::header('HTTP/1.1 400 Bad Request');
 
             return $connection->close('400 Bad Request');
         }
 
-        $hash = hash_hmac('sha256', $method ."\n" .$path .':' .json_encode($_POST), SECRET_KEY, false);
+        $secretKey = $clients[$appId];
 
-        if ($authToken !== $hash) {
+        $hash = hash_hmac('sha256', $method ."\n/" .$path .':' .json_encode($_POST), $secretKey, false);
+
+        if ($authKey !== $hash) {
             Http::header('HTTP/1.1 403 Forbidden');
 
             return $connection->close('403 Forbidden');
         }
-
-        //
-        // Here ends the mini-routing; we will continue with emiting the event.
 
         $channels = json_decode($_POST['channels'], true);
 
@@ -270,14 +295,17 @@ $socketIo->on('workerStart', function () use ($socketIo)
 
         $data = json_decode($_POST['data'], true);
 
+        // Get the Sender instance.
+        $senderIo = $socketIo->of($appId);
+
         // We will try to find the Socket instance when a socketId is specified.
         $socket = null;
 
         if (! empty($_POST['socketId'])) {
             $socketId = $_POST['socketId'];
 
-            if (isset($socketIo->sockets->connected[$socketId])) {
-                $socket = $socketIo->sockets->connected[$socketId];
+            if (isset($senderIo->connected[$socketId])) {
+                $socket = $senderIo->connected[$socketId];
             }
         }
 
@@ -287,7 +315,7 @@ $socketIo->on('workerStart', function () use ($socketIo)
                 $socket->to($channel)->emit($event, $data);
             } else {
                 // Send the event to all subscribers from specified channel.
-                $socketIo->to($channel)->emit($event, $data);
+                $senderIo->to($channel)->emit($event, $data);
             }
         }
 

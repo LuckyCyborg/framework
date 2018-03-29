@@ -45,6 +45,7 @@ return array(
 
         'push' => array(
             'driver' => 'push',
+            'appId'  => 'ThereWillBeApplicationID_32chars',
             'secret' => 'SomeRandomStringThere_1234567890',
 
             'host'   => site_url(),
