@@ -41,17 +41,12 @@ include BASEPATH . 'vendor/autoload.php';
 // Helper Functions
 //--------------------------------------------------------------------------
 
-function is_channel_member(array $members, $userId)
+function is_member(array $members, $userId)
 {
     return ! empty(array_filter($members, function ($member) use ($userId)
     {
         return $member['userId'] === $userId;
     }));
-}
-
-function socket_joined_channel($socket, $channel)
-{
-    return isset($socket->rooms[$channel]);
 }
 
 
@@ -69,7 +64,7 @@ $socketIo = new SocketIO(SENDER_PORT);
 $socketIo->on('connection', function ($socket) use ($socketIo)
 {
     // Triggered when the client sends a subscribe event.
-    $socket->on('subscribe', function ($channel, $data) use ($socket, $socketIo)
+    $socket->on('subscribe', function ($channel, $authKey, $data = null) use ($socket, $socketIo)
     {
         global $presence;
 
@@ -92,15 +87,13 @@ $socketIo->on('connection', function ($socket) use ($socketIo)
             return;
         }
 
-        $channelData = isset($data['payload']) ? $data['payload'] : null;
-
         if ($type == 'presence') {
-            $hash = hash_hmac('sha256', $socketId .':' .$channel .':' .$channelData, SECRET_KEY, false);
+            $hash = hash_hmac('sha256', $socketId .':' .$channel .':' .$data, SECRET_KEY, false);
         } else /* private channel */ {
             $hash = hash_hmac('sha256', $socketId .':' .$channel, SECRET_KEY, false);
         }
 
-        if ($hash !== $data['auth']) {
+        if ($hash !== $authKey) {
             $socket->disconnect();
 
             return;
@@ -120,12 +113,12 @@ $socketIo->on('connection', function ($socket) use ($socketIo)
         $members =& $presence[$channel];
 
         // Prepare the member information and add its socketId.
-        $member = json_decode($channelData, true);
+        $member = json_decode($data, true);
 
         $member['socketId'] = $socketId;
 
         // Determine if the user is already a member of this channel.
-        $alreadyMember = is_channel_member($members, $member['userId']);
+        $alreadyMember = is_member($members, $member['userId']);
 
         $members[$socketId] = $member;
 
@@ -166,7 +159,7 @@ $socketIo->on('connection', function ($socket) use ($socketIo)
                 //
                 unset($members[$socketId]);
 
-                if (! is_channel_member($members, $member['userId'])) {
+                if (! is_member($members, $member['userId'])) {
                     $socket->to($channel)->emit('presence:leaving', $channel, $member);
                 }
             }
@@ -180,7 +173,7 @@ $socketIo->on('connection', function ($socket) use ($socketIo)
     });
 
     // Triggered when the client sends a message event.
-    $socket->on('client event', function ($channel, $event, $data) use ($socket)
+    $socket->on('channel:event', function ($channel, $event, $data) use ($socket)
     {
         if (preg_match('#^(private|presence)-(.*)#', $channel) !== 1) {
             // The specified channel is not private.
@@ -189,7 +182,7 @@ $socketIo->on('connection', function ($socket) use ($socketIo)
         }
 
         // If it is a client event and socket joined the channel, we will emit this event.
-        else if ((preg_match('#^client-(.*)$#', $event) === 1) && socket_joined_channel($socket, $channel)) {
+        else if ((preg_match('#^client-(.*)$#', $event) === 1) && isset($socket->rooms[$channel])) {
             $socket->to($channel)->emit($event, $channel, $data);
         }
     });
@@ -214,7 +207,7 @@ $socketIo->on('connection', function ($socket) use ($socketIo)
             //
             unset($members[$socketId]);
 
-            if (! is_channel_member($members, $member['userId'])) {
+            if (! is_member($members, $member['userId'])) {
                 $socket->to($channel)->emit('presence:leaving', $channel, $member);
             }
 

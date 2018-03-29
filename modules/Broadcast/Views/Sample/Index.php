@@ -27,6 +27,39 @@
 
 <script>
 
+function socket_subscribe(socket, channel) {
+    $.ajax({
+        url: "<?= site_url('broadcasting/auth'); ?>",
+        type: "POST",
+        headers: {
+            '_token': '<?= csrf_token(); ?>',
+            'X-Socket-ID': socket.id
+        },
+        data: {
+            channel_name: channel,
+            socket_id: socket.id
+        },
+        dataType: 'json',
+        timeout : 15000,
+
+        success: function (data) {
+            if (typeof data.payload !== 'undefined') {
+                socket.emit('subscribe', channel, data.auth, data.payload);
+            } else {
+                socket.emit('subscribe', channel, data.auth);
+            }
+        },
+        error: function (xhr, ajaxOptions, thrownError) {
+            socket.disconnect();
+        }
+    });
+};
+
+function socket_unsubscribe(socket, channel) {
+    socket.emit('unsubscribe', channel);
+};
+
+
 $(document).ready(function () {
     var channel = 'presence-chat';
 
@@ -35,26 +68,7 @@ $(document).ready(function () {
 
     // Login after connecting.
     socket.on('connect', function () {
-        $.ajax({
-            url: "<?= site_url('broadcasting/auth'); ?>",
-            type: "POST",
-            headers: {
-                '_token': '<?= csrf_token(); ?>',
-                'X-Socket-ID': socket.id
-            },
-            data: {
-                channel_name: channel,
-                socket_id: socket.id
-            },
-            dataType: 'json',
-            success: function (data) {
-                socket.emit('subscribe', channel, data);
-            },
-            error: function(xhr, ajaxOptions, thrownError) {
-                socket.disconnect();
-            },
-            timeout : 15000 // Timeout of the ajax call.
-        });
+        socket_subscribe(socket, channel);
     });
 
     socket.on('presence:subscribed', function (channel, members) {
