@@ -113,7 +113,7 @@ $socketIo->on('connection', function ($socket) use ($socketIo)
 
         $members =& $presence[$channel];
 
-        // Prepare the member information.
+        // Prepare the member information and add its socketId.
         $member = json_decode($channelData, true);
 
         $member['socketId'] = $socketId;
