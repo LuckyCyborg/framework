@@ -21,9 +21,9 @@
     </div>
 </div>
 
-<script src='https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js'></script>
-
 </section>
+
+<script src='https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js'></script>
 
 <script>
 
@@ -74,10 +74,12 @@ $(document).ready(function () {
 
         socket.emit = function () {
             console.log('***', 'emit', Array.prototype.slice.call(arguments));
+
             emit.apply(socket, arguments);
         };
         socket.onevent = function (packet) {
             console.log('***', 'on', Array.prototype.slice.call(packet.data || []));
+
             onevent.apply(socket, arguments);
         };
     }());
