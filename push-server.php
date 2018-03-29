@@ -161,9 +161,12 @@ $socketIo->on('connection', function ($socket) use ($socketIo)
             if (array_key_exists($socketId, $members)) {
                 $member = $members[$socketId];
 
+                unset($member['socketId']);
+
+                //
                 unset($members[$socketId]);
 
-                if (! is_channel_member($members, $member['userId']) && socket_joined_channel($socket, $channel)) {
+                if (! is_channel_member($members, $member['userId'])) {
                     $socket->to($channel)->emit('presence:leaving', $channel, $member);
                 }
             }
@@ -206,9 +209,12 @@ $socketIo->on('connection', function ($socket) use ($socketIo)
 
             $member = $members[$socketId];
 
+            unset($member['socketId']);
+
+            //
             unset($members[$socketId]);
 
-            if (! is_channel_member($members, $member['userId']) && socket_joined_channel($socket, $channel)) {
+            if (! is_channel_member($members, $member['userId'])) {
                 $socket->to($channel)->emit('presence:leaving', $channel, $member);
             }
 
