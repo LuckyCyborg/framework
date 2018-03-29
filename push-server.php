@@ -6,8 +6,9 @@ use Workerman\WebServer;
 use Workerman\Lib\Timer;
 use PHPSocketIO\SocketIO;
 
+
 //--------------------------------------------------------------------------
-// Global Constants
+// Global Configuration
 //--------------------------------------------------------------------------
 
 defined('DS') || define('DS', DIRECTORY_SEPARATOR);
@@ -40,12 +41,17 @@ include BASEPATH . 'vendor/autoload.php';
 // Helper Functions
 //--------------------------------------------------------------------------
 
-function is_member(array $members, $userId)
+function is_channel_member(array $members, $userId)
 {
     return ! empty(array_filter($members, function ($member) use ($userId)
     {
         return $member['userId'] === $userId;
     }));
+}
+
+function socket_joined_channel($socket, $channel)
+{
+    return isset($socket->rooms[$channel]);
 }
 
 
@@ -119,7 +125,7 @@ $socketIo->on('connection', function ($socket) use ($socketIo)
         $member['socketId'] = $socketId;
 
         // Determine if the user is already a member of this channel.
-        $alreadyMember = is_member($members, $member['userId']);
+        $alreadyMember = is_channel_member($members, $member['userId']);
 
         $members[$socketId] = $member;
 
@@ -157,7 +163,7 @@ $socketIo->on('connection', function ($socket) use ($socketIo)
 
                 unset($members[$socketId]);
 
-                if (! is_member($members, $member['userId'])) {
+                if (! is_channel_member($members, $member['userId']) && socket_joined_channel($socket, $channel)) {
                     $socket->to($channel)->emit('presence:leaving', $channel, $member);
                 }
             }
@@ -174,16 +180,16 @@ $socketIo->on('connection', function ($socket) use ($socketIo)
     $socket->on('client event', function ($channel, $event, $data) use ($socket)
     {
         if (preg_match('#^(private|presence)-(.*)#', $channel) !== 1) {
-            // The channel is not private.
+            // The specified channel is not private.
 
             return;
         }
 
-        // If the socket joined the channel and it is a client event, we will emit it.
-        else if ((preg_match('#^client-(.*)$#', $event) === 1) && isset($socket->rooms[$channel])) {
+        // If it is a client event and socket joined the channel, we will emit this event.
+        else if ((preg_match('#^client-(.*)$#', $event) === 1) && socket_joined_channel($socket, $channel)) {
             $socket->to($channel)->emit($event, $channel, $data);
         }
-    }
+    });
 
     // When the client is disconnected is triggered (usually caused by closing the web page or refresh)
     $socket->on('disconnect', function () use ($socket)
@@ -202,7 +208,7 @@ $socketIo->on('connection', function ($socket) use ($socketIo)
 
             unset($members[$socketId]);
 
-            if (! is_member($members, $member['userId'])) {
+            if (! is_channel_member($members, $member['userId']) && socket_joined_channel($socket, $channel)) {
                 $socket->to($channel)->emit('presence:leaving', $channel, $member);
             }
 
