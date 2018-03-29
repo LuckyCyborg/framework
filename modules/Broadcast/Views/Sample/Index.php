@@ -35,8 +35,6 @@ $(document).ready(function () {
 
     // Login after connecting.
     socket.on('connect', function () {
-        $('#content') .html('Connected, socket_id：' + socket.id);
-
         $.ajax({
             url: "<?= site_url('broadcasting/auth'); ?>",
             type: "POST",
@@ -62,6 +60,8 @@ $(document).ready(function () {
     socket.on('presence:subscribed', function (channel, members) {
         console.log('subscribed to channel: ' + channel);
         console.log(members);
+
+        $('#content') .html('Subscribed to channel：<b>' + channel + '</b>, socketId: <b>' + socket.id + '</b>');
     });
 
     socket.on('presence:joining', function (channel, member) {
@@ -71,6 +71,12 @@ $(document).ready(function () {
 
     socket.on('presence:leaving', function (channel) {
         console.log('leaving the channel: ' + channel);
+    });
+
+    socket.on('disconnected', function () {
+        console.log('disconnected');
+
+        $('#content') .html('Disconnected, socket_id：' + socket.id);
     });
 
     // When the back-end pushes messages ...
