@@ -155,10 +155,6 @@ class PushBroadcaster extends Broadcaster
             return ($status == 200) && ($response->getBody() == '200 OK');
         }
         catch (RequestException $e) {
-            dump($client);
-
-            dump($e->getMessage());
-
             throw new BroadcastException($e->getMessage());
         }
     }
