@@ -70,7 +70,7 @@ $(document).ready(function () {
     var chatChannel = 'presence-chat';
 
     // The connection server.
-    var socket = io.connect('<?= site_url(); ?>' + ':2120/' + appId);
+    var socket = io.connect('quasar.dev:2120/' + appId);
 
     (function () {
         var emit = socket.emit,
@@ -88,7 +88,7 @@ $(document).ready(function () {
         };
     }());
 
-    // Login after connecting.
+    // Subscribe after connecting.
     socket.on('connect', function () {
         socket_subscribe(socket, userChannel);
         socket_subscribe(socket, chatChannel);

@@ -154,8 +154,8 @@ class PushBroadcaster extends Broadcaster
         try {
             $response = $client->post($url, array(
                 'headers' => array(
-                    'Connection'    => 'close',
-                    'Authorization' => 'Bearer ' .$hash,
+                    'CONNECTION'    => 'close',
+                    'AUTHORIZATION' => 'Bearer ' .$hash,
                 ),
                 'body' => $payload,
             ));
@@ -179,14 +179,13 @@ class PushBroadcaster extends Broadcaster
      */
     public function socketAuth($channel, $socketId, $customData = null)
     {
-        if (preg_match('#^[-a-zA-Z0-9_=@,.;]+$#', $channel) !== 1) {
+        if (preg_match('/^[-a-z0-9_=@,.;]+$/i', $channel) !== 1) {
             throw new BroadcastException('Invalid channel name ' .$channel);
         }
-        /*
-        if (preg_match('#^[a-z0-9]+$#', $socketId) !== 1) {
+
+        if (preg_match('/^(?:\/[a-z0-9]+#)?[a-z0-9]+$/i', $socketId) !== 1) {
             throw new BroadcastException('Invalid socket ID ' .$socketId);
         }
-        */
 
         if (! is_null($customData)) {
             $signature = hash_hmac('sha256', $socketId .':' .$channel .':' .$customData, $this->secretKey, false);
